@@ -154,7 +154,7 @@ class HelperService {
     }
 
     Map createJsonForNewDataResource(map){
-        map.api_key = grailsApplication.config.registryApiKey
+        map.api_key = grailsApplication.config.getProperty("registryApiKey")
         map.resourceType = "species-list"
         map.user = 'Species list upload'
         map.firstName = localAuthService.firstname()?:""
@@ -164,7 +164,7 @@ class HelperService {
 
     def uploadFile(druid, uploadedFile){
         if(druid){
-            def destDir = new File(grailsApplication.config.bie.download + File.separator + druid + File.separator)
+            def destDir = new File(grailsApplication.config.getProperty("bie.download", String) + File.separator + druid + File.separator)
             destDir.mkdirs()
             def destFile = new File(destDir, "species_list.csv")
             uploadedFile.transferTo(destFile)

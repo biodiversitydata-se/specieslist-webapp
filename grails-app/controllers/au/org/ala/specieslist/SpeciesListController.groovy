@@ -411,7 +411,7 @@ class SpeciesListController {
             }
 
             if(grailsApplication.config.biocache.indexAuthoritative.toBoolean() && splist.isAuthoritative){
-                redirect(url: grailsApplication.config.spatial.baseURL + "/?q=species_list_uid:" + splist.dataResourceUid)
+                redirect(url: grailsApplication.config.getProperty("spatial.baseURL") + "/?q=species_list_uid:" + splist.dataResourceUid)
             } else {
                 def guids = getGuidsForList(params.id, grailsApplication.config.downloadLimit)
                 def unMatchedNames = getUnmatchedNamesForList(params.id, grailsApplication.config.downloadLimit)
@@ -419,7 +419,7 @@ class SpeciesListController {
                 log.debug "unMatchedNames = " + unMatchedNames
                 def qid = biocacheService.getQid(guids, unMatchedNames, title, splist.wkt)
                 if(qid?.status == 200){
-                    redirect(url: grailsApplication.config.spatial.baseURL + "/?q=qid:"+qid.result)
+                    redirect(url: grailsApplication.config.getProperty("spatial.baseURL") + "/?q=qid:"+qid.result)
                 } else {
                     render(view: '../error', model: [message: "Unable to view occurrences records. Please let us know if this error persists."])
                 }

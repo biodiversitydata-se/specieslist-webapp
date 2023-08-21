@@ -180,9 +180,11 @@ class QueryService {
             if (query){
                 selectedFacets << [query: key, facet: query]
             } else if (key == LIST_TYPE){
-                def cleanedVaue = value.replaceAll("eq:", "")
-                query = listTyoeFacets.get(cleanedVaue)
-                selectedFacets << [query: key, facet: query]
+                if (value) {
+                    def cleanedValue = value.replaceAll("eq:", "")
+                    query = listTyoeFacets.get(cleanedValue)
+                    selectedFacets << [query: key, facet: query]
+                }
             } else if (key == WKT){
                 query = WKT_QUERY
                 selectedFacets << [query: WKT, facet: [label:'spatialBounds.list.label']]

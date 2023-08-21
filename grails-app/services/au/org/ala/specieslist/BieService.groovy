@@ -47,8 +47,8 @@ class BieService {
      * @return
      */
     List bulkSpeciesLookupWithGuids(list) {
-        def http = new HTTPBuilder(grailsApplication.config.bieService.baseURL + "/species/guids/bulklookup.json")
-        http.getClient().getParams().setParameter("http.socket.timeout", grailsApplication.config.outboundhttp.timeout.toInteger())
+        def http = new HTTPBuilder(grailsApplication.config.getProperty("bieService.baseURL") + "/species/guids/bulklookup.json")
+        http.getClient().getParams().setParameter("http.socket.timeout", grailsApplication.config.getProperty("outboundhttp.timeout", Integer))
         http.setHeaders(['User-Agent': "${grailsApplication.config.outboundhttp.useragent}"])
         def jsonBody = (list as JSON).toString()
         try {

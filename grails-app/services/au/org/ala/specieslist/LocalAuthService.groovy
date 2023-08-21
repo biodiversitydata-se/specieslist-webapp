@@ -33,6 +33,6 @@ class LocalAuthService {
     }
 
     def isAdmin() {
-        return (grailsApplication.config.security.cas.bypass).toBoolean() || authService.userInRole(ROLE_ADMIN)
+        return (grailsApplication.config.getProperty("security.cas.bypass", Boolean)) || authService.userInRole(ROLE_ADMIN)
     }
 }
