@@ -15,7 +15,7 @@
 
 package au.org.ala.specieslist
 
-
+import groovy.time.*
 import org.hibernate.Criteria
 import org.hibernate.criterion.CriteriaQuery
 import org.hibernate.criterion.Order
@@ -852,7 +852,7 @@ class QueryService {
         } else {
             def qParam = '%'+q+'%'
             def queryParameters = q ? [dataResourceUid: id, matchedName: qParam, commonName: qParam, rawScientificName: qParam] : [dataResourceUid: id]
-
+            def timeStart = new Date()
             def results = SpeciesListItem.executeQuery('select kvp.key, kvp.value, kvp.vocabValue, count(sli) as cnt from SpeciesListItem as sli ' +
                     'join sli.kvpValues as kvp where sli.dataResourceUid = :dataResourceUid ' +
                     "${q ? 'and (sli.matchedName like :matchedName or sli.commonName like :commonName or sli.rawScientificName like :rawScientificName) ' : ''} " +
@@ -860,7 +860,8 @@ class QueryService {
                     queryParameters)
 
             properties = results.findAll{it[1].length()<maxLengthForFacet}.groupBy{it[0]}.findAll{it.value.size()>1 }
-
+            def timeStop = new Date()
+            log.info("Query KVP took " + TimeCategory.minus(timeStop, timeStart))
             //obtain the families from the common list facets
             def commonResults = SpeciesListItem.executeQuery('select family, count(*) as cnt from SpeciesListItem ' +
                     'where family is not null AND dataResourceUid = :dataResourceUid ' +
@@ -870,6 +871,7 @@ class QueryService {
             if(commonResults.size() > 1) {
                 map.family = commonResults
             }
+            log.info("Query families from facets took " +TimeCategory.minus(new Date(), timeStop))
         }
         //if there was a facet included in the result we will need to divide the
         if(properties) {
