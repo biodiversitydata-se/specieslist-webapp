@@ -3,7 +3,8 @@ FROM tomcat:9.0-jdk11-temurin
 RUN mkdir -p \
 	/data/specieslist-webapp/config
 
-COPY build/libs/specieslist-webapp-*-plain.war $CATALINA_HOME/webapps/ROOT.war
+COPY sbdi/data/config/logback.xml /data/specieslist-webapp/config/logback.xml
+COPY build/libs/specieslist-webapp-[0-9].[0-9].[0-9].war $CATALINA_HOME/webapps/ROOT.war
 
 ENV DOCKERIZE_VERSION v0.7.0
 
