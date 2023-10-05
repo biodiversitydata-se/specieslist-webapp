@@ -32,7 +32,7 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: package
-          path: build/libs
+          path: build/libs/specieslist-webapp-[0-9].[0-9].[0-9].war
 
       - name: Log in to the Container registry
         if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
