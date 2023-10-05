@@ -13,5 +13,14 @@ services:
     ports:
       - 3306:3306
 
+  specieslist:
+    image: sbdi/specieslist-webapp-dev
+    build:
+      context: .
+      no_cache: true
+    ports:
+      - 8080:8080
+    volumes:
+      - ./sbdi/data/config/specieslist-webapp-config.properties:/data/specieslist-webapp/config/specieslist-webapp-config.properties
 volumes:
   db_data_specieslists:
