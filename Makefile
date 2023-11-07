@@ -1,6 +1,6 @@
 #! make
 run:
-	docker compose up --detach mysqldb-specieslist-webapp
+	docker compose up --detach mysqldb-specieslist
 	./gradlew bootRun
 
 #In the specieslist-webapp-config.properties change the dataSource.url to point to the docker service mysqldb-specieslist as defined in the compose file
