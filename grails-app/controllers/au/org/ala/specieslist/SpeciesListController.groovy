@@ -21,6 +21,7 @@ import grails.converters.JSON
 import grails.gorm.transactions.Transactional
 import org.apache.commons.io.filefilter.FalseFileFilter
 import org.grails.web.json.JSONObject
+import org.hibernate.criterion.DetachedCriteria
 import org.springframework.web.multipart.MultipartHttpServletRequest
 
 import javax.annotation.PostConstruct
@@ -83,6 +84,8 @@ class SpeciesListController {
         def sl = SpeciesList.get(params.id)
         if(sl){
             helperService.deleteDataResourceForList(sl.dataResourceUid)
+            List msIds = SpeciesListItem.executeQuery("select sli.matchedSpecies.id as id from SpeciesListItem as sli where dataResourceUid = :dataResourceUid", ["dataResourceUid": sl.dataResourceUid])
+            MatchedSpecies.executeUpdate("delete from MatchedSpecies where id in (:msIds)", ["msIds": msIds])
             SpeciesListItem.executeUpdate("delete from SpeciesListItem where dataResourceUid = :dataResourceUid", ["dataResourceUid": sl.dataResourceUid])
             SpeciesListKVP.executeUpdate("delete from SpeciesListKVP where dataResourceUid = :dataResourceUid", ["dataResourceUid": sl.dataResourceUid])
             SpeciesList.executeUpdate("delete from SpeciesList where dataResourceUid = :dataResourceUid", ["dataResourceUid": sl.dataResourceUid])
@@ -205,6 +208,7 @@ class SpeciesListController {
 
                     def url = createLink(controller:'speciesListItem', action:'list', id: druid) +"?max=10"
                     //update the URL for the list
+                    log.info("Register ${url} to collectory server")
                     helperService.updateDataResourceForList(druid,
                         [
                              pubDescription: formParams.description,
@@ -507,13 +511,24 @@ class SpeciesListController {
     /**
      * Rematches the scientific names in the supplied list
      */
-    @Transactional
     def rematch() {
+        long  beforeId = 0
         if (params.id && !params.id.startsWith("dr")) {
             params.id = SpeciesList.get(params.id)?.dataResourceUid
             log.info("Rematching for " + params.id)
         } else {
-            log.error("Rematching for ALL")
+            String msg = "Rematching for ALL"
+            if (params.beforeId) {
+                try {
+                    beforeId = Long.parseLong(params.beforeId)
+                    if ( beforeId > 0) {
+                        msg = "Continue to rematch the rest of species before id: " + beforeId
+                    }
+                }catch(Exception e){
+                }
+            }
+
+            log.warn(msg)
         }
         Integer totalRows, offset = 0;
         String id = params.id
@@ -523,66 +538,7 @@ class SpeciesListController {
             return
         }
 
-        if (id) {
-            totalRows = SpeciesListItem.countByDataResourceUid(id)
-        } else {
-            totalRows = SpeciesListItem.count();
-        }
-
-        while (offset < totalRows) {
-            List items
-            List guidBatch = [], sliBatch = []
-            Map<SpeciesList, List<SpeciesListItem>> batches = new HashMap<>()
-            List<SpeciesListItem> searchBatch = new ArrayList<SpeciesListItem>()
-            if (id) {
-                items = SpeciesListItem.findAllByDataResourceUid(id, [max: BATCH_SIZE, offset: offset])
-            } else {
-                items = SpeciesListItem.list(max: BATCH_SIZE, offset: offset)
-            }
-
-            SpeciesListItem.withSession { session ->
-                items.eachWithIndex { SpeciesListItem item, Integer i ->
-                    SpeciesList speciesList = item.mylist
-                    List<SpeciesListItem> batch = batches.get(speciesList)
-                    if (batch == null) {
-                        batch = new ArrayList<>();
-                        batches.put(speciesList, batch)
-                    }
-                    String rawName = item.rawScientificName
-                    log.debug i + ". Rematching: " + rawName + "/" + speciesList.dataResourceUid
-                    if (rawName && rawName.length() > 0) {
-                        batch.add(item)
-                    } else {
-                        item.guid = null
-                        if (!item.save(flush: true)) {
-                            log.error "Error saving item (" + rawName + "): " + item.errors()
-                        }
-                    }
-                }
-                batches.each { list, batch ->
-                    helperService.matchAll(batch, list)
-                    batch.each {SpeciesListItem item ->
-                        if (item.guid) {
-                            guidBatch.push(item.guid)
-                            sliBatch.push(item)
-                        }
-                    }
-                }
-
-                if (!guidBatch.isEmpty()) {
-                    helperService.getCommonNamesAndUpdateRecords(sliBatch, guidBatch)
-                }
-
-                session.flush()
-                session.clear()
-            }
-
-            offset += BATCH_SIZE;
-            log.info("Rematched ${offset} of ${totalRows} - ${Math.round(offset * 100 / totalRows)}% complete")
-            if (offset > totalRows) {
-                log.error("Rematched ${offset} of ${totalRows} - ${Math.round(offset * 100 / totalRows)}% complete")
-            }
-        }
+        helperService.rematch(id,beforeId)
 
         render(text: "${message(code: 'admin.lists.page.button.rematch.messages', default: 'Rematch complete')}")
     }

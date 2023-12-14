@@ -18,6 +18,10 @@ package au.org.ala.specieslist
 import au.org.ala.names.ws.api.NameUsageMatch
 //import au.org.ala.names.ws.api.SearchStyle
 import com.opencsv.CSVReader
+import grails.gorm.transactions.NotTransactional
+import java.time.LocalDateTime
+import java.sql.Timestamp
+import groovy.time.*
 import grails.gorm.transactions.Transactional
 import groovyx.net.http.ContentType
 import groovyx.net.http.HTTPBuilder
@@ -43,7 +47,7 @@ class HelperService {
 
     def grailsApplication
 
-    def localAuthService, authService, userDetailsService
+    def localAuthService, authService, userDetailsService, webService
 
     BieService bieService
 
@@ -52,6 +56,20 @@ class HelperService {
     ColumnMatchingService columnMatchingService
 
     Integer BATCH_SIZE
+    /**
+    * Completed
+    * Running
+    * Failed
+    * Abnormal: If the status is still running,but the last update time is 30 min before. It will be set as abnormal,
+    * since it should update every 1-5 minutes in processing.  The Abnormal status may be caused by server shutdown.
+     * */
+    enum Status {
+        RUNNING,
+        COMPLETED,
+        FAILED,
+        ABORT
+    }
+
 
     // Only permit URLs for added safety
     private final LinkExtractor extractor = LinkExtractor.builder().linkTypes(EnumSet.of(LinkType.URL)).build()
@@ -107,11 +125,11 @@ class HelperService {
             def deleteUrl = grailsApplication.config.collectory.baseURL +"/ws/dataResource/" + drId
             def http = new HTTPBuilder(deleteUrl)
             http.getClient().getParams().setParameter("http.socket.timeout", new Integer(5000))
-            try {
+            http.setHeaders([Authorization: "Bearer ${webService.getTokenService().getAuthToken(false)}"])
 
+            try {
                 http.request(Method.DELETE) {
                     requestContentType = ContentType.JSON
-                    headers."Authorization" = "${grailsApplication.config.registryApiKey}"
                     response.success = { resp ->
                         def result = (resp.getEntity() != null ? EntityUtils.toString(resp.getEntity()) : "")
                         log.info("${drId} has been deleted from ${grailsApplication.config.collectory.baseURL} with ${result}")
@@ -414,6 +432,7 @@ class HelperService {
                                Boolean isPrivate, String region, String authority, String category,
                                String generalisation, String sdsType, Boolean looseSearch, /*SearchStyle searchStyle,*/ String[] header, Map vocabs) {
         log.debug("Loading species list " + druid + " " + listname + " " + description + " " + listUrl + " " + header + " " + vocabs)
+
         def kvpmap = [:]
         addVocab(druid,vocabs,kvpmap)
         //attempt to retrieve an existing list first
@@ -451,10 +470,13 @@ class HelperService {
         Map termIdx = columnMatchingService.getTermAndIndex(header)
         int itemCount = 0
         int totalCount = 0
+        log.info('Loading records from CSV/Excel...')
+        String[] rawHeaders = []
         while ((nextLine = reader.readNext()) != null) {
             totalCount++
             if(!checkedHeader){
                 checkedHeader = true
+                rawHeaders = nextLine
                 // only read next line if current line is a header line
                 if(columnMatchingService.getTermAndIndex(nextLine).size() > 0) {
                     nextLine = reader.readNext()
@@ -463,26 +485,33 @@ class HelperService {
 
             if(nextLine.length > 0 && termIdx.size() > 0 && hasValidData(termIdx, nextLine)){
                 itemCount++
-                sl.addToItems(insertSpeciesItem(nextLine, druid, termIdx, header, kvpmap, itemCount, sl))
+                sl.addToItems(insertSpeciesItem(nextLine, druid, termIdx, header, rawHeaders,kvpmap, itemCount, sl))
             }
-
+            if (totalCount % 500 == 0) {
+                log.info("${totalCount} records have been processed.")
+            }
         }
+
+        log.info("Completed ${totalCount} records in total")
         if(!sl.validate()){
             log.error(sl.errors.allErrors?.toString())
         }
 
+        log.info("Matching ${totalCount} records....")
         List sli = sl.getItems()?.toList()
         matchCommonNamesForSpeciesListItems(sli)
-
+        log.info("Saving ${totalCount} records....")
         sl.save()
-
+        log.info("${totalCount} records saved")
         [totalRecords: totalCount, successfulItems: itemCount]
     }
 
+    @Deprecated
     def loadSpeciesListFromFile(listname, druid, filename, boolean useHeader, header,vocabs){
 
         CSVReader reader = new CSVReader(new FileReader(filename),',' as char)
         header = header ?: reader.readNext()
+
         int speciesValueIdx = columnMatchingService.getSpeciesIndex(header)
         int count =0
         String [] nextLine
@@ -499,7 +528,7 @@ class HelperService {
         sl.lastMatched = new Date()
         while ((nextLine = reader.readNext()) != null) {
             if(org.apache.commons.lang.StringUtils.isNotBlank(nextLine)){
-                sl.addToItems(insertSpeciesItem(nextLine, druid, speciesValueIdx, header,kvpmap, sl))
+                sl.addToItems(insertSpeciesItem(nextLine, druid, speciesValueIdx, header, kvpmap, sl))
                 count++
             }
 
@@ -511,6 +540,7 @@ class HelperService {
         sl.save()
     }
 
+    @Deprecated
     def insertSpeciesItem(String[] values, druid, int speciesIdx, Object[] header, map, int order, SpeciesList sl){
         values = parseRow(values as List)
         log.debug("Inserting " + values.toArrayString())
@@ -534,7 +564,19 @@ class HelperService {
         sli
     }
 
-    def insertSpeciesItem(String[] values, String druid, Map termIndex, Object[] header, Map map, int order, SpeciesList sl){
+    /**
+     *
+     * @param values
+     * @param druid
+     * @param termIndex
+     * @param header
+     * @param rawHeaders  Use the original header when store values into KVP, especial for vernacular name variants
+     * @param map
+     * @param order
+     * @param sl
+     * @return
+     */
+    def insertSpeciesItem(String[] values, String druid, Map termIndex, Object[] header, String[] rawHeaders, Map map, int order, SpeciesList sl){
         values = parseRow(values as List)
         log.debug("Inserting " + values.toArrayString())
 
@@ -544,16 +586,38 @@ class HelperService {
         sli.itemOrder = order
 
         int i = 0
+
+        def excludedFields = [QueryService.RAW_SCIENTIFIC_NAME, QueryService.COMMON_NAME]
+
+        // vernacular name is converted to 'commonName' in termIndex
+        // check commonNameColumns in config ->  commonname,common,vernacular,vernacularname will be interpreted as "commonName"
+        // We want to store the original header value as key
+        if (termIndex.containsKey(QueryService.COMMON_NAME)) {
+            def kValue =  values[termIndex.get(QueryService.COMMON_NAME)] ? values[termIndex.get(QueryService.COMMON_NAME)] : ""
+            def commanName = QueryService.COMMON_NAME
+            def possibleNames  = grailsApplication.config.getProperty("commonNameColumns")?.split(",")
+            def orginalName = rawHeaders.find{it -> possibleNames*.toLowerCase().contains(it.toLowerCase())}
+            SpeciesListKVP kvp = new SpeciesListKVP(key: orginalName ? orginalName : commanName, value: kValue, dataResourceUid: druid)
+            if  (kvp.itemOrder == null) {
+                kvp.itemOrder = 0
+            }
+            sli.addToKvpValues(kvp)
+        }
+
         header.each {
-            if(!termIndex.containsValue(i) && values.length > i && values[i]?.trim()){
-                SpeciesListKVP kvp = map.get(it.toString()+"|"+values[i], new SpeciesListKVP(key: it.toString(), value: values[i], dataResourceUid: druid))
-                if  (kvp.itemOrder == null) {
-                    kvp.itemOrder = i
+            if (values.length > i && values[i]?.trim()) {
+                if (!excludedFields.contains(termIndex.find{it.value == i}?.key)) {
+                    def kValue = values[i] ? values[i] : ""
+                    SpeciesListKVP kvp = map.get(it.toString()+"|"+values[i], new SpeciesListKVP(key: it.toString(), value: kValue, dataResourceUid: druid))
+                    if  (kvp.itemOrder == null) {
+                        kvp.itemOrder = i
+                    }
+                    sli.addToKvpValues(kvp)
                 }
-                sli.addToKvpValues(kvp)
             }
             i++
         }
+
         matchNameToSpeciesListItem(sli.rawScientificName, sli, sl)
         sli
     }
@@ -568,30 +632,45 @@ class HelperService {
             match = nameExplorerService.searchForRecordByLsid(sli.rawScientificName)
         }
         if(match && match.success){
-            sli.guid = match.getTaxonConceptID()
-            sli.matchedName = match.getScientificName()
-            sli.author = match.getScientificNameAuthorship()
-            sli.commonName = match.getVernacularName()
+            // Not necessary
+            sli.matchedName = match.scientificName
+            sli.commonName = match.vernacularName
+            //Legacy: 'family, kingdom' field is used by group query for facades
             sli.family = match.getFamily()
             sli.kingdom = match.getKingdom()
+            sli.guid = match.taxonConceptID
+            MatchedSpecies newMS = new MatchedSpecies()
+            newMS.taxonConceptID  = match.taxonConceptID
+            newMS.scientificName = match.scientificName
+            newMS.scientificNameAuthorship = match.scientificNameAuthorship
+            newMS.vernacularName = match.vernacularName
+            newMS.kingdom = match.kingdom
+            newMS.phylum = match.phylum
+            newMS.taxonClass = match.classs
+            newMS.taxonOrder = match.order
+            newMS.family = match.family
+            newMS.genus = match.genus
+            newMS.taxonRank = match.rank
+            sli.matchedSpecies = newMS
         } else {
             sli.guid = null
             sli.matchedName = null
             sli.author = null
-            sli.commonName = null
-            sli.family = null
-            sli.kingdom = null
+            sli.matchedSpecies = null
+            //reset image
+            sli.imageUrl = null
         }
+        sli.save()
     }
 
     void matchAll(List searchBatch, SpeciesList speciesList) {
         List<NameUsageMatch> matches = nameExplorerService.findAll(searchBatch, speciesList);
         matches.eachWithIndex {  NameUsageMatch match, Integer index ->
             SpeciesListItem sli = searchBatch[index]
-            if (!match.success) {
+            if (match && !match.success) {
                 match = nameExplorerService.searchForRecordByCommonName(sli.rawScientificName)
             }
-            if (!match.success) {
+            if (match && !match.success) {
                 match = nameExplorerService.searchForRecordByLsid(sli.rawScientificName)
             }
             if (match && match.success) {
@@ -601,9 +680,33 @@ class HelperService {
                 sli.commonName = match.getVernacularName()
                 sli.family = match.getFamily()
                 sli.kingdom = match.getKingdom()
+
+                MatchedSpecies newMS = new MatchedSpecies()
+                newMS.taxonConceptID  = match.taxonConceptID
+                newMS.scientificName = match.scientificName
+                newMS.scientificNameAuthorship = match.scientificNameAuthorship
+                newMS.vernacularName = match.vernacularName
+                newMS.kingdom = match.kingdom
+                newMS.phylum = match.phylum
+                newMS.taxonClass = match.classs
+                newMS.taxonOrder = match.order
+                newMS.family = match.family
+                newMS.genus = match.genus
+                newMS.taxonRank = match.rank
+                newMS.lastUpdated = new Date()
+
+                sli.matchedSpecies = newMS
             } else {
+                sli.guid = null
+                sli.matchedName = null
+                sli.author = null
+                sli.matchedSpecies = null
+                sli.lastUpdated = new Date()
+                //reset image
+                sli.imageUrl = null
                 log.info("Unable to match species list item - ${sli.rawScientificName}")
             }
+            sli.save()
         }
     }
 
@@ -664,6 +767,9 @@ class HelperService {
     def createRecord (params) {
         def sl = SpeciesList.get(params.id)
         log.debug "params = " + params
+        if (!sl && params.druid) {
+            sl = SpeciesList.findByDataResourceUid(params.druid)
+        }
 
         if (!params.rawScientificName) {
             return [text: "Missing required field: rawScientificName", status: 400]
@@ -677,12 +783,13 @@ class HelperService {
             keys.each { key ->
                 log.debug "key: " + key + " has value: " + params[key]
                 def value = params[key]
-                def itemOrder = params["itemOrder_${key}"]
+                def itemOrder = params["itemOrder_${key}"] ?: 0
                 if (value) {
                     def newKvp = SpeciesListKVP.findByDataResourceUidAndKeyAndValue(sl.dataResourceUid, key, value)
                     if (!newKvp) {
                         log.debug "Couldn't find an existing KVP, so creating a new one..."
                         newKvp = new SpeciesListKVP(dataResourceUid: sli.dataResourceUid, key: key, value: params[key], SpeciesListItem: sli, itemOrder: itemOrder );
+                        newKvp.save()
                     }
                     sli.addToKvpValues(newKvp)
                 }
@@ -701,6 +808,8 @@ class HelperService {
                 sl.lastMatched = new Date()
                 sl.lastUploaded = new Date()
                 sl.save(flush: true)
+
+                sli.save()
 
                 // Commented out as we would like to keep species list generic
                 /*   def preferredSpeciesImageListName = grailsApplication.config.ala.preferred.species.name
@@ -739,5 +848,165 @@ class HelperService {
             log.error("an exception occurred during rematching: ${e.message}");
             log.error(e.stackTrace?.toString())
         }
+    }
+
+    /**
+     * Rematching status:
+     * Completed
+     * Running
+     * Failed
+     * Abnormal: If the status is still running,but the last update time is 30 min before. It will be set as abnormal,
+     * since it should update every 1-5 minutes in processing.  The Abnormal status may be caused by server shutdown.
+     * @return
+     */
+    @NotTransactional
+    def queryRematchingProcess(){
+        //Update to abort status if the last update time of a running process is 30Minutes before
+        def expiredTime =Timestamp.valueOf(LocalDateTime.now().plusMinutes(-30))
+        RematchLog.withTransaction {
+            def abortLogs = RematchLog.findAllByStatusAndRecentProcessTimeLessThan(Status.RUNNING.name(), expiredTime)
+            abortLogs.each {
+                it.status = Status.ABORT
+                it.save()
+            }
+        }
+
+        boolean processing = RematchLog.findByStatus(Status.RUNNING.toString()) ? true : false
+        def logs = RematchLog.list(max: 10, sort: "id", order: "desc")
+        Map result = ["processing": processing, "history": logs]
+        return result
+    }
+
+    /**
+     *
+     * @param id the species need to rematched
+     * @param beforeId if @id is not given, but @before is given, it will rematch all species before 'beforeId'
+     * @return
+     */
+    @NotTransactional
+    def rematch(id, beforeId) {
+        Integer totalRows, offset = 0;
+        // Save to DB if no id is given.
+        boolean saveToDB = id ? false:true
+        def rematchLog = new RematchLog(byWhom: authService.userId ?: "Developer", startTime: new Date(), recentProcessTime: new Date(), status: Status.RUNNING);
+        rematchLog.saveToDB = saveToDB
+
+        if (id) {
+            totalRows = SpeciesListItem.countByDataResourceUid(id)
+        } else {
+            if (beforeId && beforeId > 0) {
+                def c = SpeciesListItem.createCriteria()
+                totalRows = c.list(max:1, offset: 0) {
+                    order "id", "desc"
+                    le("id", beforeId)
+                }.totalCount
+            } else {
+                totalRows = SpeciesListItem.count();
+                //Total rematch - Clean matchedSpecies table
+                MatchedSpecies.withTransaction {
+                    MatchedSpecies.executeUpdate("delete from MatchedSpecies")
+                    SpeciesListItem.executeUpdate("update SpeciesListItem set matched_species_id = null")
+                }
+            }
+        }
+        RematchLog.withTransaction {
+            rematchLog.total = totalRows
+            rematchLog.remaining = totalRows
+            rematchLog.persist()
+        }
+
+        try {
+            while (true) {
+                List items
+                List guidBatch = [], sliBatch = []
+                Map<SpeciesList, List<SpeciesListItem>> batches = new HashMap<>()
+                List<SpeciesListItem> searchBatch = new ArrayList<SpeciesListItem>()
+
+                if (id) {
+                    items = SpeciesListItem.findAllByDataResourceUid(id, [max: BATCH_SIZE, offset: offset])
+                } else {
+                    //items = SpeciesListItem.list(max: BATCH_SIZE, offset: offset, sort: "id", order: "desc")
+                    if (beforeId) {
+                        def c = SpeciesListItem.createCriteria()
+                        items = c.list(max:BATCH_SIZE, offset: offset) {
+                            order "id", "desc"
+                            le("id", beforeId)
+                        }
+                    } else {
+                        items = SpeciesListItem.list(max: BATCH_SIZE, offset: offset, sort: "id", order: "desc")
+                    }
+                    //Update
+                    totalRows = items.totalCount
+                    rematchLog.total = items.totalCount
+                }
+
+                if ( items.size() <=0 ){
+                    break;
+                }
+
+                def start = new Date()
+                SpeciesListItem.withTransaction {
+                    items.eachWithIndex { SpeciesListItem item, Integer i ->
+                        SpeciesList speciesList = item.mylist
+                        List<SpeciesListItem> batch = batches.get(speciesList)
+                        if (batch == null) {
+                            batch = new ArrayList<>();
+                            batches.put(speciesList, batch)
+                        }
+                        String rawName = item.rawScientificName
+                        log.debug i + ". Rematching: " + rawName + "/" + speciesList.dataResourceUid
+                        if (rawName && rawName.length() > 0) {
+                            batch.add(item)
+                        } else {
+                            item.guid = null
+                            if (!item.save(flush: true)) {
+                                log.error "Error saving item (" + rawName + "): " + item.errors()
+                            }
+                        }
+                    }
+                    batches.each { list, batch ->
+                        matchAll(batch, list)
+                        batch.each { SpeciesListItem item ->
+                            if (item.guid) {
+                                guidBatch.push(item.guid)
+                                sliBatch.push(item)
+                            }
+                        }
+                    }
+
+                    if (!guidBatch.isEmpty()) {
+                        getCommonNamesAndUpdateRecords(sliBatch, guidBatch)
+                    }
+                } // End transaction
+
+                offset += BATCH_SIZE;
+                if (totalRows < offset) {
+                    log.info("Rematched the last ${totalRows} species, time elapsed:" + TimeCategory.minus(new Date(), start))
+                    rematchLog.remaining = 0
+                } else {
+                    log.info("Rematched ${offset} of ${totalRows} completed, time elapsed:" + TimeCategory.minus(new Date(), start))
+                    rematchLog.remaining = totalRows - offset
+                }
+                RematchLog.withTransaction {
+                    rematchLog.logs = "ID: ${items.last().id} was rematched!"
+                    rematchLog.currentRecordId = items.last().id
+                    rematchLog.recentProcessTime = new Date()
+                    rematchLog.persist()
+                }
+            }// end full iteration
+            rematchLog.status = Status.COMPLETED
+            rematchLog.endTime = new Date()
+            rematchLog.logs = "Rematch completed"
+            log.info("Rematching is completed")
+        } catch (Exception e) {
+            log.error("Error in rematching:" + e.message)
+            rematchLog.status = Status.FAILED
+            rematchLog.endTime = new Date()
+        } finally {
+            RematchLog.withTransaction{
+                rematchLog.persist()
+            }
+        } // end try
+        return rematchLog
     }
 }

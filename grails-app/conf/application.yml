@@ -250,7 +250,7 @@ userDetails:
     url: https://auth-test.ala.org.au/userdetails/
 
 speciesNameColumns: 'scientificname,scientific,sciname,sname,latinname,latin,taxon,taxonname,taxonomic name'
-commonNameColumns: 'commonname,common,vernacular,vernacularname'
+commonNameColumns: 'commonname,common,vernacular,vernacularname,common name,vernacular name'
 ambiguousNameColumns: 'name'
 kingdomColumns: 'kingdom,regnum'
 phylumColumns: 'phylum,divisio,division'
@@ -261,3 +261,6 @@ genusColumns: 'genus,genericEpithet,generic epithet'
 rankColumns: 'taxonrank,rank,taxon rank,taxonomicrank,taxonomic rank,linnaean rank'
 #determnines whether a  list owner's email is visible on list info panel.
 ownerVisibleToEditor: false
+
+biocacheService:
+    baseURL: https://biocache-ws.ala.org.au/ws
