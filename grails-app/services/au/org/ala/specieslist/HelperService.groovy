@@ -125,7 +125,8 @@ class HelperService {
             def deleteUrl = grailsApplication.config.collectory.baseURL +"/ws/dataResource/" + drId
             def http = new HTTPBuilder(deleteUrl)
             http.getClient().getParams().setParameter("http.socket.timeout", new Integer(5000))
-            http.setHeaders([Authorization: "Bearer ${webService.getTokenService().getAuthToken(false)}"])
+            // SBDI: this crashes since jwt is not enabled
+            //http.setHeaders([Authorization: "Bearer ${webService.getTokenService().getAuthToken(false)}"])
 
             try {
                 http.request(Method.DELETE) {
