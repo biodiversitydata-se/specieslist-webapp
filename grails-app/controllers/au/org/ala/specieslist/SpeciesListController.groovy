@@ -88,6 +88,8 @@ class SpeciesListController {
             SpeciesListItem.executeUpdate("delete from SpeciesListItem where dataResourceUid = :dataResourceUid", ["dataResourceUid": sl.dataResourceUid])
             MatchedSpecies.executeUpdate("delete from MatchedSpecies where id in (:msIds)", ["msIds": msIds])
             SpeciesListKVP.executeUpdate("delete from SpeciesListKVP where dataResourceUid = :dataResourceUid", ["dataResourceUid": sl.dataResourceUid])
+            sl.editors = []
+            sl.save(flush: true)
             SpeciesList.executeUpdate("delete from SpeciesList where dataResourceUid = :dataResourceUid", ["dataResourceUid": sl.dataResourceUid])
         }
         redirect(action: 'list')
