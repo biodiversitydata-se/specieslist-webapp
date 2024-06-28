@@ -635,7 +635,7 @@ class HelperService {
         if(match && match.success){
             // Not necessary
             sli.matchedName = match.scientificName
-            sli.commonName = match.vernacularName
+            sli.commonName = StringUtils.capitalize(match.vernacularName)
             //Legacy: 'family, kingdom' field is used by group query for facades
             sli.family = match.getFamily()
             sli.kingdom = match.getKingdom()
@@ -644,7 +644,7 @@ class HelperService {
             newMS.taxonConceptID  = match.taxonConceptID
             newMS.scientificName = match.scientificName
             newMS.scientificNameAuthorship = match.scientificNameAuthorship
-            newMS.vernacularName = match.vernacularName
+            newMS.vernacularName = StringUtils.capitalize(match.vernacularName)
             newMS.kingdom = match.kingdom
             newMS.phylum = match.phylum
             newMS.taxonClass = match.classs
@@ -678,7 +678,7 @@ class HelperService {
                 sli.guid = match.getTaxonConceptID()
                 sli.matchedName = match.getScientificName()
                 sli.author = match.getScientificNameAuthorship()
-                sli.commonName = match.getVernacularName()
+                sli.commonName = StringUtils.capitalize(match.getVernacularName())
                 sli.family = match.getFamily()
                 sli.kingdom = match.getKingdom()
 
@@ -686,7 +686,7 @@ class HelperService {
                 newMS.taxonConceptID  = match.taxonConceptID
                 newMS.scientificName = match.scientificName
                 newMS.scientificNameAuthorship = match.scientificNameAuthorship
-                newMS.vernacularName = match.vernacularName
+                newMS.vernacularName = StringUtils.capitalize(match.vernacularName)
                 newMS.kingdom = match.kingdom
                 newMS.phylum = match.phylum
                 newMS.taxonClass = match.classs
