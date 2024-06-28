@@ -905,8 +905,8 @@ class HelperService {
                 totalRows = SpeciesListItem.count();
                 //Total rematch - Clean matchedSpecies table
                 MatchedSpecies.withTransaction {
-                    MatchedSpecies.executeUpdate("delete from MatchedSpecies")
                     SpeciesListItem.executeUpdate("update SpeciesListItem set matched_species_id = null")
+                    MatchedSpecies.executeUpdate("delete from MatchedSpecies")
                 }
             }
         }
