@@ -1295,9 +1295,12 @@ class WebServiceController {
 
     @JsonIgnoreProperties('metaClass')
     static class SpeciesListItemBody {
-        String guid
+        //String guid
         String rawScientificName
-        HashMap<String, String> extra
+        String additionalProp1
+        String additionalProp2
+        String additionalProp3
+        //HashMap<String, String> extra
     }
 
     @JsonIgnoreProperties('metaClass')
@@ -1366,7 +1369,7 @@ class WebServiceController {
                             required = true)
             ],
             requestBody = @RequestBody(
-                    description = "The JSON object containing new species list item guid, rawScientificName and extra fields and values.",
+                    description = "The JSON object containing rawScientificName and extra fields and values.",
                     required = true,
                     content = @Content(
                             mediaType = 'application/json',
@@ -1422,6 +1425,7 @@ class WebServiceController {
                     )
             ]
     )
+    @Path("/ws/deleteItem")
     @RequireApiKey(scopes = ['ala/internal'])
     @Transactional
     def deleteItem() {
