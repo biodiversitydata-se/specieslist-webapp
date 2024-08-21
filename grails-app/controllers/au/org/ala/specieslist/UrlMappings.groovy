@@ -37,6 +37,14 @@ class UrlMappings {
             action = [GET:'getListItemDetails']
         }
 
+        "/ws/speciesListItemsInternal/${druid}?" (controller: 'webService'){
+            action = [GET:'getListItemDetailsInternal']
+        }
+
+        "/ws/speciesListInternal/${druid}?" (controller: 'webService'){
+            action = [GET:'getListDetailsInternal']
+        }
+
         "/ws/createItem" (controller: 'webService', action: 'createItem')
 
         "/ws/deleteItem" (controller: 'webService', action: 'deleteItem')
@@ -71,7 +79,16 @@ class UrlMappings {
             action = [GET: 'getSpeciesListItemKvp']
         }
 
-        "/ws/rematchStatus" (controller: "webService", action: "rematchStatus")
+        "/ws/rematchLogs" (controller: "webService", action: "rematchLogs")
+
+            "/ws/rematchLog/$id"(controller: 'webService') {
+                    action = [GET: 'rematchLog', DELETE: 'deleteRematchLog']
+            }
+
+//        "/ws/deleteRematchLog/$id" (controller: "webService", action: "deleteRematchLog")
+//
+//        "/ws/downloadRematchLog/$id" (controller: "webService", action: "downloadRematchLog")
+
 		"/"(controller: 'public' ,action:  'index')
 		"500"(view:'/error')
         "404"(view:'/404')

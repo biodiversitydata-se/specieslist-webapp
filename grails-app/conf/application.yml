@@ -1,5 +1,4 @@
 ---
-
 logging:
     config: /data/specieslist-webapp/config/logback.xml
 
@@ -148,6 +147,12 @@ environments:
         security:
             cas:
                 appServerName: "http://dev.ala.org.au"
+        userdetails:
+            api:
+                url : "https://api.test.ala.org.au/userdetails/cognito/"
+            web:
+                url : "https://aws-auth-test-2023.test.ala.org.au/userdetails/"
+
     test:
         grails:
             serverURL: "https://lists-test.ala.org.au"
@@ -158,11 +163,16 @@ environments:
             driverClassName: org.h2.Driver
             username: 'specieslist'
             password: 'specieslist'
-            dbCreate: create-drop
+            dbCreate: update
             url: jdbc:h2:mem:specieslist;LOCK_TIMEOUT=10000;DB_CLOSE_ON_EXIT=FALSE
         security:
             cas:
                 appServerName: "https://lists-test.ala.org.au"
+        userdetails:
+            api:
+                url: "https://api.test.ala.org.au/userdetails/cognito/"
+            web:
+                url: "https://aws-auth-test-2023.test.ala.org.au/userdetails/"
     production:
         grails:
             serverURL: "https://lists.ala.org.au"
@@ -190,8 +200,14 @@ environments:
         security:
             cas:
                 appServerName: "https://lists.ala.org.au"
+        logging:
+            config: /data/specieslist-webapp/config/logback.xml
+        userdetails:
+            api:
+                url : "https://api.ala.org.au/userdetails/"
+            web:
+                url : "https://auth.ala.org.au/userdetails/"
 
----
 headerAndFooter:
     baseURL: "https://www.ala.org.au/commonui-bs3-2019"
     version: "2"
@@ -245,9 +261,11 @@ security:
 webservice:
     jwt: true
     jwt-scopes: "openid users/read"
+    client-id: "Replace it"
+    client-secret: "Replace it"
 
-userDetails:
-    url: https://auth-test.ala.org.au/userdetails/
+#userDetails:
+#    url: https://auth-test.ala.org.au/userdetails/
 
 speciesNameColumns: 'scientificname,scientific,sciname,sname,latinname,latin,taxon,taxonname,taxonomic name'
 commonNameColumns: 'commonname,common,vernacular,vernacularname,common name,vernacular name'
@@ -264,3 +282,16 @@ ownerVisibleToEditor: false
 
 biocacheService:
     baseURL: https://biocache-ws.ala.org.au/ws
+
+openapi:
+    title: Species list REST services
+    description: REST services for interacting with the Species lists
+    terms: https://www.ala.org.au/terms-of-use/
+    contact:
+        name: Support
+        email: support@ala.org.au
+    license:
+        name: Mozilla Public License 1.1
+        url: https://www.mozilla.org/en-US/MPL/1.1/
+    version: '@info.app.version@'
+    cachetimeoutms: 0

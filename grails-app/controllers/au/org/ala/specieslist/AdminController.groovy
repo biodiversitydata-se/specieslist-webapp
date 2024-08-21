@@ -15,6 +15,8 @@
 
 package au.org.ala.specieslist
 
+import grails.converters.JSON
+
 class AdminController {
 
     def queryService
@@ -56,7 +58,7 @@ class AdminController {
         try {
             // retrieve qualified SpeciesListItems for performance reason
             def itemsIds = queryService.getFilterSpeciesListItemsIds(params)
-            def lists = queryService.getFilterListResult(params, false, itemsIds)
+            def lists = queryService.getFilterListResult(params, false, itemsIds, request, response)
             def rematchLogs = helperService.queryRematchingProcess()
             def model = [lists:lists,
                          total:lists.totalCount,
@@ -79,7 +81,7 @@ class AdminController {
 
     // Access managed by AdminInterceptor
     def updateListsWithUserIds() {
-        Boolean successful = userDetailsService.updateSpeciesListUserDetails()
-        render(status: successful ? 200 : 404, text: "Update of editors was ${(successful)?'':'not'} successful")
+        def result = userDetailsService.updateSpeciesListUserDetails()
+        render result as JSON
     }
 }

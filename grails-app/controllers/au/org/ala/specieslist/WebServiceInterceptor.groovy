@@ -20,6 +20,7 @@ import org.apache.http.HttpStatus
 
 
 class WebServiceInterceptor {
+    int order = LOWEST_PRECEDENCE
 
     LocalAuthService localAuthService
     AuthService authService
@@ -38,11 +39,11 @@ class WebServiceInterceptor {
 
             // view permissions
             if (actionName == 'saveList' || actionName == 'markAsPublished') {
-                if (!checkEditSecurity(druid, authService, localAuthService)) {
+                if (!checkEditSecurity(druid, authService, localAuthService, request, response)) {
                     return false
                 }
             } else {
-                if (!checkViewSecurity(druid, authService, localAuthService)) {
+                if (!checkViewSecurity(druid, authService, localAuthService, request, response)) {
                     return false
                 }
             }
@@ -59,10 +60,10 @@ class WebServiceInterceptor {
     // The auth and localAuth services need to be passed in in order to use the same instance that the filters
     // closure has - this is an issue when unit testing because the closure gets the mock services, but this method
     // gets the 'real' injected services unless we pass them in
-    private boolean checkViewSecurity(String druid, AuthService authService, LocalAuthService localAuthService) {
+    private boolean checkViewSecurity(String druid, AuthService authService, LocalAuthService localAuthService, request, response) {
         SecurityUtil securityUtil = new SecurityUtil(localAuthService: localAuthService, authService: authService)
 
-        if (!securityUtil.checkViewAccess(druid)) {
+        if (!securityUtil.checkViewAccess(druid, request, response)) {
             response.sendError(HttpStatus.SC_UNAUTHORIZED, "Not authorised")
             false
         } else {
@@ -73,10 +74,10 @@ class WebServiceInterceptor {
     // The auth and localAuth services need to be passed in in order to use the same instance that the filters
     // closure has - this is an issue when unit testing because the closure gets the mock services, but this method
     // gets the 'real' injected services unless we pass them in
-    private boolean checkEditSecurity(String druid, AuthService authService, LocalAuthService localAuthService) {
+    private boolean checkEditSecurity(String druid, AuthService authService, LocalAuthService localAuthService, request, response) {
         SecurityUtil securityUtil = new SecurityUtil(localAuthService: localAuthService, authService: authService)
 
-        if (!securityUtil.checkEditAccess(druid)) {
+        if (!securityUtil.checkEditAccess(druid, request, response)) {
             response.sendError(HttpStatus.SC_UNAUTHORIZED, "Not authorised")
             false
         } else {
