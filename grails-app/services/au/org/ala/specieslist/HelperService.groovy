@@ -899,8 +899,8 @@ class HelperService {
 
         if (reset) {
             MatchedSpecies.withTransaction {
-                MatchedSpecies.executeUpdate("delete from MatchedSpecies where id in (select matchedSpecies from SpeciesListItem where data_resource_uid = :listDRId)", [listDRId: speciesList.dataResourceUid])
                 SpeciesListItem.executeUpdate("update SpeciesListItem set matchedSpecies = null where data_resource_uid = :listDRId", [listDRId: speciesList.dataResourceUid])
+                MatchedSpecies.executeUpdate("delete from MatchedSpecies where id in (select matchedSpecies from SpeciesListItem where data_resource_uid = :listDRId)", [listDRId: speciesList.dataResourceUid])
             }
         }
 
