@@ -18,6 +18,7 @@
     <meta name="layout" content="${grailsApplication.config.skin.layout}"/>
 
     <meta name="breadcrumb" content="Species lists"/>
+    <link rel="canonical" href="${grailsApplication.config.getProperty('grails.serverURL')}/public/speciesLists" />
     <title>Species lists | ${grailsApplication.config.skin.orgNameLong}</title>
 </head>
 
