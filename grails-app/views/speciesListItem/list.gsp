@@ -33,7 +33,7 @@
     <script language="JavaScript" type="text/javascript" src="${asset.assetPath(src: 'getQueryParam.js')}"></script>
     <script language="JavaScript" type="text/javascript"
             src="${asset.assetPath(src: 'jquery.doubleScroll.js')}"></script>
-    <title>${message(code:'generic.specieslist.title', default:'Species list items')} | ${grailsApplication.config.skin.orgNameLong}</title>
+    <title>${speciesList?.listName} | ${grailsApplication.config.skin.orgNameLong}</title>
     <asset:stylesheet src="fancybox.css"/>
     <style type="text/css">
     #buttonDiv, #refine, .not-visible {
