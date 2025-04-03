@@ -6,7 +6,7 @@ RUN mkdir -p \
 COPY sbdi/data/config/logback.xml /data/specieslist-webapp/config/logback.xml
 COPY build/libs/specieslist-webapp-[0-9].[0-9].[0-9].war $CATALINA_HOME/webapps/ROOT.war
 
-ENV DOCKERIZE_VERSION v0.7.0
+ENV DOCKERIZE_VERSION=v0.9.3
 
 RUN apt-get update \
     && apt-get install -y wget \
