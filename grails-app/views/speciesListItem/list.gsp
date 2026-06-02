@@ -382,8 +382,7 @@
             <div class="col-md-6">
                 <div class="row">
                     <h2 class="subject-subtitle">
-                        ${message(code:'view.lists.header', default:'Species List')}: <a href="${collectoryUrl}/public/show/${params.id}"
-                                         title="${message(code:'view.lists.dataresource.tooltip', default:'view Date Resource page')}">${speciesList?.listName}</a>
+                        ${message(code:'view.lists.header', default:'Species List')}: ${speciesList?.listName}
                         &nbsp;&nbsp;
                         <div class="btn-group btn-group" id="listActionButtons">
                             <a href="#" id="toggleListInfo" class="btn btn-default btn-sm"><i
@@ -481,12 +480,13 @@
                         <div class="pull-right margin-top-10">
                             <a href="#download" class="btn btn-primary" title="${message(code:'generic.lists.button.download.tooltip', default:'View the download options for this species list.')}"
                                id="downloadLink">${message(code:'generic.lists.button.download.label', default: 'Download')}</a>
-
+                            <!--
                             <a class="btn btn-primary" title="${message(code:'generic.lists.button.occurrences.tooltip_1', deafult:'View occurrences for up to')} ${maxDownload} ${message(code:'generic.lists.button.occurrences.tooltip_2', deafult:'species on the list')}"
                                href="${request.contextPath}/speciesList/occurrences/${params.id}${params.toQueryString()}&type=Search">${message(code:'generic.lists.button.occurrences.label', default: 'View occurrence records')}</a>
 
                             <a href="${request.contextPath}/speciesList/spatialPortal/${params.id}${params.toQueryString()}&type=Search"
                                class="btn btn-primary" title="${message(code:'generic.lists.button.spatial.tooltip', default:'View the spatial portal.')} ">${message(code:'generic.lists.button.spatial.label', default:'View in spatial portal')}</a>
+                           -->
                         </div> <!-- rightfloat -->
                     </div>
                 </div>
@@ -578,9 +578,11 @@
             <dd><g:formatBoolean boolean="${speciesList.looseSearch}" true="Yes" false="No"/></dd>
 %{--            <dt>${message(code: 'speciesList.searchStyle.label', default: 'Search style')}</dt>--}%
 %{--            <dd>${speciesList.searchStyle}</dd>--}%
+            <!--
             <dt>${message(code: 'speciesList.metadata.label', default: 'Metadata link')}</dt>
             <dd><a href="${grailsApplication.config.collectory.baseURL}/public/show/${speciesList.dataResourceUid}">${grailsApplication.config.collectory.baseURL}/public/show/${speciesList.dataResourceUid}</a>
             </dd>
+            -->
         </dl>
         <g:if test="${userCanEditPermissions}">
             <div id="edit-meta-div" class="not-visible">
