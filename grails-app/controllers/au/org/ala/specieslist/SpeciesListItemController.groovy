@@ -120,6 +120,11 @@ class SpeciesListItemController {
                     log.debug(requestParams.toQueryString())
 
                     def fqs = requestParams.fq ? [requestParams.fq].flatten().findAll { it != null } : null
+                    int fqsCount = fqs ? fqs.size() : 0
+                    int maxFqsCount = 3
+                    if (fqsCount > maxFqsCount) {
+                        fqs = fqs.subList(0, maxFqsCount);
+                    }
 
                     def baseQueryAndParams = requestParams.fq ? queryService.constructWithFacets(" from SpeciesListItem sli ", fqs, requestParams.id, requestParams.q) : null
                     log.debug(baseQueryAndParams?.toString())
@@ -150,7 +155,7 @@ class SpeciesListItemController {
                             downloadReasons: loggerService.getReasons(),
                             users: queryService.getUsersForList(),
                             userId: authService.getUserId(),
-                            facets: queryService.generateFacetValues(fqs, baseQueryAndParams, requestParams.id, requestParams.q, maxLengthForFacet),
+                            facets: fqsCount >= maxFqsCount ? [:] : queryService.generateFacetValues(fqs, baseQueryAndParams, requestParams.id, requestParams.q, maxLengthForFacet),
                             fqs : fqs
                     ])
                 }
