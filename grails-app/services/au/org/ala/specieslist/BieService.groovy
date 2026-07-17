@@ -47,6 +47,8 @@ class BieService {
      * @return
      */
     List bulkSpeciesLookupWithGuids(list) {
+        []
+        /*
         def http = new HTTPBuilder(grailsApplication.config.bieService.baseURL + "/species/guids/bulklookup")
         http.getClient().getParams().setParameter("http.socket.timeout", grailsApplication.config.outboundhttp.timeout.toInteger())
         http.setHeaders(['User-Agent': "${grailsApplication.config.outboundhttp.useragent}"])
@@ -58,6 +60,7 @@ class BieService {
             log.error("Unable to obtain species details from BIE - " + ex.getMessage(), ex)
             []
         }
+        */
     }
 
     def generateFieldGuide(druid,guids, email){
